@@ -36,41 +36,46 @@ tab1, tab2, tab3 = st.tabs(["📋 9-Racecard Processor", "⚙️ Master Engine v
 
 with tab1:
     st.subheader("📥 Meeting Raw Data & Auto-Parser")
-    st.caption("Paste your full meeting or multi-race raw text below to auto-split across up to 9 races, or configure them manually.")
+    st.caption("Paste your full meeting or multi-race raw text below and click auto-split to distribute across your 9 race cards.")
 
     # --- MEETING GLOBAL SIDEBAR CONTROLS ---
     st.sidebar.header("⚙️ Meeting Parameters")
-    meeting_course = st.sidebar.text_input("Default Course Name", value="Kempton")
+    meeting_course = st.sidebar.text_input("Default Course Name", value="York")
     
     # Going Condition with Secondary Modifier
-    base_going = st.sidebar.selectbox("Base Going", ["Standard", "Good", "Good to Soft", "Soft", "Heavy", "Yielding", "Good to Firm", "Firm"])
-    going_modifier = st.sidebar.text_input("Going Qualifier (Optional)", placeholder="e.g. Good in places")
+    base_going = st.sidebar.selectbox("Base Going", ["Soft", "Good", "Good to Soft", "Standard", "Heavy", "Yielding", "Good to Firm", "Firm"], index=0)
+    going_modifier = st.sidebar.text_input("Going Qualifier (Optional)", value="Good to Soft in places")
 
     # Master Auto-Parser Input
-    bulk_raw_input = st.text_area("Paste full meeting / multiple racecards here:", height=150, placeholder="Paste raw text containing multiple race times (e.g. 13:50, 14:25...)")
+    bulk_raw_input = st.text_area("Paste full meeting / multiple racecards here:", height=180, placeholder="Paste your full copied text containing multiple races here...")
     
     # Initialize session state for 9 races if not present
     if "races_data" not in st.session_state:
         st.session_state.races_data = [
-            {"time": f"{13+i}:15", "class": "Class 4", "distance": "1m", "text": ""} for i in range(9)
+            {"time": f"{13+i}:30", "class": "Class 1", "distance": "6f", "text": ""} for i in range(9)
         ]
 
     if st.button("🪄 Auto-Split Pasted Text into 9 Races", type="primary"):
         if bulk_raw_input.strip():
-            # Simple splitter based on time patterns like HH:MM
-            chunks = re.split(r'(\d{2}:\d{2})', bulk_raw_input)
-            race_index = 0
+            # Split text by common race card header patterns or time indicators (e.g. "13:30" or dates/times)
+            # This splits whenever it encounters a new time pattern like HH:MM preceded by space/date
+            raw_blocks = re.split(r'(?=\b\d{2}:\d{2}\b)', bulk_raw_input)
             
-            for i in range(1, len(chunks), 2):
-                if race_index < 9:
-                    r_time = chunks[i]
-                    r_content = chunks[i+1].strip() if i+1 < len(chunks) else ""
-                    st.session_state.races_data[race_index]["time"] = r_time
-                    st.session_state.races_data[race_index]["text"] = f"{r_time}\n{r_content}"
+            race_index = 0
+            for block in raw_blocks:
+                if block.strip() and race_index < 9:
+                    # Try to extract time from the block
+                    time_match = re.search(r'\b(\d{2}:\d{2})\b', block)
+                    if time_match:
+                        r_time = time_match.group(1)
+                        st.session_state.races_data[race_index]["time"] = r_time
+                    
+                    st.session_state.races_data[race_index]["text"] = block.strip()
                     race_index += 1
-            st.success(f"Successfully auto-populated {race_index} races from pasted text!")
+            
+            st.success(f"Successfully auto-sorted {race_index} races into the configuration cards below!")
         else:
-            st.warning("Please paste raw text into the box above first.")
+            st.warning("Please paste your raw racecard text into the box above first.")
 
     st.divider()
     st.subheader("🏁 Configure & Process 9-Race Card")
@@ -78,7 +83,6 @@ with tab1:
     # Combine going string
     full_going = f"{base_going} ({going_modifier})" if going_modifier.strip() else base_going
 
-    # Display 9 expandable race slots
     processed_meeting_output = []
     
     for i in range(9):
@@ -86,10 +90,10 @@ with tab1:
         with st.expander(f"Race {r_num} — {st.session_state.races_data[i]['time']} ({meeting_course})", expanded=(i == 0)):
             rc_col1, rc_col2, rc_col3 = st.columns(3)
             r_time = rc_col1.text_input(f"Race {r_num} Time", value=st.session_state.races_data[i]['time'], key=f"r_time_{i}")
-            r_class = rc_col2.selectbox(f"Race {r_num} Class", ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Group 1", "Group 2", "Group 3"], index=3, key=f"r_class_{i}")
+            r_class = rc_col2.selectbox(f"Race {r_num} Class", ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Group 1", "Group 2", "Group 3"], index=0, key=f"r_class_{i}")
             r_dist = rc_col3.text_input(f"Race {r_num} Distance", value=st.session_state.races_data[i]['distance'], key=f"r_dist_{i}")
             
-            r_text = st.text_area(f"Race {r_num} Raw Runners", value=st.session_state.races_data[i]['text'], height=150, key=f"r_text_{i}", placeholder="Paste runners for this specific race...")
+            r_text = st.text_area(f"Race {r_num} Raw Runners", value=st.session_state.races_data[i]['text'], height=160, key=f"r_text_{i}")
             
             # Save back to session state
             st.session_state.races_data[i]['time'] = r_time
@@ -112,9 +116,9 @@ with tab1:
         st.subheader("📋 Complete Formatted Meeting Output (One-Click Mobile Copy)")
         full_meeting_text = "\n\n".join(processed_meeting_output)
         st.code(full_meeting_text, language="text")
-        st.success("All configured races formatted successfully!")
+        st.success("Meeting card processed successfully!")
     else:
-        st.info("Fill in or auto-parse your race data above to generate the formatted meeting code block.")
+        st.info("Paste your meeting data above and click 'Auto-Split' to populate and format your 9-race card.")
 
 with tab2:
     st.subheader("🎯 Master Engine v5.27.0 Selection Suite")
@@ -123,7 +127,7 @@ with tab2:
     with st.form("engine_form"):
         e_col1, e_col2 = st.columns(2)
         eng_course = e_col1.text_input("Meeting Course", value=meeting_course, key="eng_course")
-        eng_time = e_col2.text_input("Race Time", value="18:30", key="eng_time")
+        eng_time = e_col2.text_input("Race Time", value="13:30", key="eng_time")
         
         st.divider()
         
@@ -183,7 +187,7 @@ with tab3:
         col_l1, col_l2, col_l3 = st.columns(3)
         log_date = col_l1.date_input("Date", value=datetime.today())
         log_course = col_l2.text_input("Course", value=meeting_course, key="l_course")
-        log_time = col_l3.text_input("Race Time", value="18:30", key="l_time")
+        log_time = col_l3.text_input("Race Time", value="13:30", key="l_time")
         
         col_l4, col_l5, col_l6 = st.columns(3)
         log_horse = col_l4.text_input("Selection / Horse Name")
