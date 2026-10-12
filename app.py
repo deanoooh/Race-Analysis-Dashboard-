@@ -27,32 +27,31 @@ init_db()
 # Set page config for mobile and desktop compatibility
 st.set_page_config(page_title="Race Analysis Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-st.title("🏇 Race Analysis & Engine Dashboard")
-st.caption("Standardized Racecard Formatting, Selection Suite & Performance Tracker")
+st.title("🏇 Race Analysis & Master Engine Dashboard")
+st.caption("Standardized Racecard Formatting, ROI Tracker & v5.27.0 Engine Suite")
 
 # --- NAVIGATION TABS ---
-tab1, tab2 = st.tabs(["📋 Racecard Processor", "📊 History & ROI Tracker"])
+tab1, tab2, tab3 = st.tabs(["📋 Racecard Processor", "📊 History & ROI Tracker", "⚙️ Master Engine v5.27.0"])
 
 with tab1:
     # --- SIDEBAR CONTROLS ---
     st.sidebar.header("⚙️ Race Parameters")
-    course = st.sidebar.text_input("Course Name", value="Kempton")
-    race_time = st.sidebar.text_input("Race Time", value="18:30")
-    going = st.sidebar.selectbox("Going Condition", ["Standard", "Good", "Good to Soft", "Soft", "Heavy", "Yielding"])
-    race_class = st.sidebar.selectbox("Race Class", ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Group 1", "Group 2", "Group 3"])
-    distance = st.sidebar.text_input("Distance", value="1m 2f")
+    course = st.sidebar.text_input("Course Name", value="Kempton", key="t1_course")
+    race_time = st.sidebar.text_input("Race Time", value="18:30", key="t1_time")
+    going = st.sidebar.selectbox("Going Condition", ["Standard", "Good", "Good to Soft", "Soft", "Heavy", "Yielding"], key="t1_going")
+    race_class = st.sidebar.selectbox("Race Class", ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Group 1", "Group 2", "Group 3"], key="t1_class")
+    distance = st.sidebar.text_input("Distance", value="1m 2f", key="t1_dist")
 
-    # --- MAIN CONTENT AREA ---
     col1, col2 = st.columns([1, 1])
 
     with col1:
         st.subheader("📥 Input Raw Racecard / Data")
-        raw_input = st.text_area("Paste raw racecard text, runner lists, or odds here:", height=320, placeholder="1 - Horse Name - Jockey - Trainer - Odds...")
+        raw_input = st.text_area("Paste raw racecard text, runner lists, or odds here:", height=320, placeholder="1 - Horse Name - Jockey - Trainer - Odds...", key="t1_input")
 
     with col2:
         st.subheader("📋 Output (One-Click Mobile Copy)")
         
-        if st.button("🚀 Process Racecard", type="primary"):
+        if st.button("🚀 Process Racecard", type="primary", key="t1_btn"):
             if not raw_input.strip():
                 st.warning("Please paste raw racecard text into the input box on the left.")
             else:
@@ -77,8 +76,8 @@ with tab2:
     with st.form("log_form"):
         col_l1, col_l2, col_l3 = st.columns(3)
         log_date = col_l1.date_input("Date", value=datetime.today())
-        log_course = col_l2.text_input("Course", value="Kempton")
-        log_time = col_l3.text_input("Race Time", value="18:30")
+        log_course = col_l2.text_input("Course", value="Kempton", key="l_course")
+        log_time = col_l3.text_input("Race Time", value="18:30", key="l_time")
         
         col_l4, col_l5, col_l6 = st.columns(3)
         log_horse = col_l4.text_input("Selection / Horse Name")
@@ -91,13 +90,12 @@ with tab2:
             if not log_horse.strip():
                 st.error("Please enter a horse name.")
             else:
-                # Calculate profit/loss assuming a 1 unit stake
                 if log_result == "Won":
                     pl = log_odds - 1.0
                 elif log_result == "Lost":
                     pl = -1.0
                 else:
-                    pl = 0.0 # Placed/Non-Runner break even for simple level stakes
+                    pl = 0.0
                 
                 conn = sqlite3.connect('racing_history.db')
                 c = conn.cursor()
@@ -112,7 +110,6 @@ with tab2:
     st.divider()
     st.subheader("📈 Performance Summary & ROI")
     
-    # Load data from database
     conn = sqlite3.connect('racing_history.db')
     df = pd.read_sql_query("SELECT * FROM selections ORDER BY date DESC, id DESC", conn)
     conn.close()
@@ -129,7 +126,6 @@ with tab2:
         
         st.dataframe(df, use_container_width=True)
         
-        # Option to clear or reset database records if needed
         if st.button("🗑️ Clear All History"):
             conn = sqlite3.connect('racing_history.db')
             c = conn.cursor()
@@ -138,4 +134,64 @@ with tab2:
             conn.close()
             st.rerun()
     else:
-        st.info("No selections logged yet. Use the form above to record your first bet or engine selection.")
+        st.info("No selections logged yet. Use the form above to record your first bet.")
+
+with tab3:
+    st.subheader("🎯 Master Engine v5.27.0 Selection Suite")
+    st.caption("Generate structured Primary, Secondary, and Chaos selections per race.")
+    
+    with st.form("engine_form"):
+        e_col1, e_col2 = st.columns(2)
+        eng_course = e_col1.text_input("Meeting Course", value="Kempton", key="eng_course")
+        eng_time = e_col2.text_input("Race Time", value="18:30", key="eng_time")
+        
+        st.divider()
+        
+        col_p, col_s, col_c = st.columns(3)
+        
+        with col_p:
+            st.markdown("### 🥇 Primary")
+            primary_horse = st.text_input("Primary Selection", placeholder="Top Engine Pick")
+            primary_odds = st.text_input("Primary Odds/SP", placeholder="e.g. 5/2")
+            primary_notes = st.text_area("Primary Rationale", placeholder="Key rating & metrics...")
+            
+        with col_s:
+            st.markdown("### 🥈 Secondary")
+            secondary_horse = st.text_input("Secondary Selection", placeholder="Strong Danger / Value")
+            secondary_odds = st.text_input("Secondary Odds/SP", placeholder="e.g. 11/2")
+            secondary_notes = st.text_area("Secondary Rationale", placeholder="Pace / Trainer form...")
+            
+        with col_c:
+            st.markdown("### 🌪️ Chaos")
+            chaos_horse = st.text_input("Chaos Selection", placeholder="Longshot / Wildcard")
+            chaos_odds = st.text_input("Chaos Odds/SP", placeholder="e.g. 16/1")
+            chaos_notes = st.text_area("Chaos Rationale", placeholder="Draw bias / price discrepancy...")
+            
+        generate_engine_card = st.form_submit_button("⚡ Generate Engine v5.27.0 Card", type="primary")
+        
+        if generate_engine_card:
+            if not primary_horse.strip():
+                st.error("Please at least enter a Primary selection.")
+            else:
+                engine_output = [
+                    f"=== MASTER ENGINE v5.27.0 | {eng_course.upper()} {eng_time} ===",
+                    "",
+                    f"🥇 PRIMARY SELECTION:",
+                    f"• Horse: {primary_horse} ({primary_odds})",
+                    f"• Rationale: {primary_notes}",
+                    "",
+                    f"🥈 SECONDARY SELECTION:",
+                    f"• Horse: {secondary_horse} ({secondary_odds})",
+                    f"• Rationale: {secondary_notes}",
+                    "",
+                    f"🌪️ CHAOS SELECTION:",
+                    f"• Horse: {chaos_horse} ({chaos_odds})",
+                    f"• Rationale: {chaos_notes}",
+                    "================================================"
+                ]
+                
+                final_engine_text = "\n".join(engine_output)
+                st.divider()
+                st.subheader("📋 Formatted Engine Output (Ready for Mobile Copy)")
+                st.code(final_engine_text, language="text")
+                st.success("Master Engine v5.27.0 card successfully generated!")
