@@ -57,23 +57,36 @@ with tab1:
 
     if st.button("🪄 Auto-Split Pasted Text into 9 Races", type="primary"):
         if bulk_raw_input.strip():
-            # Split text by common race card header patterns or time indicators (e.g. "13:30" or dates/times)
-            # This splits whenever it encounters a new time pattern like HH:MM preceded by space/date
-            raw_blocks = re.split(r'(?=\b\d{2}:\d{2}\b)', bulk_raw_input)
+            # Split the pasted text by lines to find race headers/times
+            lines = bulk_raw_input.strip().split('\n')
+            races_found = []
+            current_race_text = []
+            current_time = "13:30"
             
-            race_index = 0
-            for block in raw_blocks:
-                if block.strip() and race_index < 9:
-                    # Try to extract time from the block
-                    time_match = re.search(r'\b(\d{2}:\d{2})\b', block)
-                    if time_match:
-                        r_time = time_match.group(1)
-                        st.session_state.races_data[race_index]["time"] = r_time
-                    
-                    st.session_state.races_data[race_index]["text"] = block.strip()
-                    race_index += 1
+            # Regex pattern to find times like 13:30 or 2:30
+            time_pattern = re.compile(r'\b(\d{2}:\d{2})\b')
             
-            st.success(f"Successfully auto-sorted {race_index} races into the configuration cards below!")
+            for line in lines:
+                time_match = time_pattern.search(line)
+                # If a line contains a time and looks like a header, treat it as a new race boundary
+                if time_match and any(keyword in line.lower() for keyword in ['york', 'kempton', 'ascot', 'going', 'distance', 'class', '–', '-']):
+                    if current_race_text:
+                        races_found.append((current_time, "\n".join(current_race_text)))
+                        current_race_text = []
+                    current_time = time_match.group(1)
+                
+                current_race_text.append(line)
+            
+            # Don't forget the last race block
+            if current_race_text:
+                races_found.append((current_time, "\n".join(current_race_text)))
+            
+            # Populate up to 9 slots
+            for idx, (r_time, r_content) in enumerate(races_found[:9]):
+                st.session_state.races_data[idx]["time"] = r_time
+                st.session_state.races_data[idx]["text"] = r_content
+                
+            st.success(f"Successfully auto-sorted {len(races_found)} races into the configuration cards below!")
         else:
             st.warning("Please paste your raw racecard text into the box above first.")
 
