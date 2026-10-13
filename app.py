@@ -48,45 +48,44 @@ with tab1:
 
     # Master Auto-Parser Input
     bulk_raw_input = st.text_area("Paste full meeting / multiple racecards here:", height=180, placeholder="Paste your full copied text containing multiple races here...")
-    
-    # Initialize session state for 9 races if not present
-    if "races_data" not in st.session_state:
-        st.session_state.races_data = [
-            {"time": f"{13+i}:30", "class": "Class 1", "distance": "6f", "text": ""} for i in range(9)
-        ]
 
     if st.button("🪄 Auto-Split Pasted Text into 9 Races", type="primary"):
         if bulk_raw_input.strip():
-            # Split the pasted text by lines to find race headers/times
+            # Robust splitting: find lines with date/course/time patterns or time alone
             lines = bulk_raw_input.strip().split('\n')
-            races_found = []
-            current_race_text = []
-            current_time = "13:30"
+            blocks = []
+            current_block = []
             
-            # Regex pattern to find times like 13:30 or 2:30
-            time_pattern = re.compile(r'\b(\d{2}:\d{2})\b')
-            
+            # Pattern matches times like 13:30, 14:05, 2:30, etc.
+            time_re = re.compile(r'\b(\d{1,2}:\d{2})\b')
+
             for line in lines:
-                time_match = time_pattern.search(line)
-                # If a line contains a time and looks like a header, treat it as a new race boundary
-                if time_match and any(keyword in line.lower() for keyword in ['york', 'kempton', 'ascot', 'going', 'distance', 'class', '–', '-']):
-                    if current_race_text:
-                        races_found.append((current_time, "\n".join(current_race_text)))
-                        current_race_text = []
-                    current_time = time_match.group(1)
-                
-                current_race_text.append(line)
+                # If a line contains a time and looks like a race header line, start a new block
+                if time_re.search(line) and any(char in line for char in ['/', '–', '-', ':', 'Going', 'Distance', 'Class', 'Runners']):
+                    if current_block:
+                        blocks.append("\n".join(current_block))
+                        current_block = []
+                current_block.append(line)
             
-            # Don't forget the last race block
-            if current_race_text:
-                races_found.append((current_time, "\n".join(current_race_text)))
-            
-            # Populate up to 9 slots
-            for idx, (r_time, r_content) in enumerate(races_found[:9]):
-                st.session_state.races_data[idx]["time"] = r_time
-                st.session_state.races_data[idx]["text"] = r_content
-                
-            st.success(f"Successfully auto-sorted {len(races_found)} races into the configuration cards below!")
+            if current_block:
+                blocks.append("\n".join(current_block))
+
+            # Store extracted blocks into Streamlit session state keys directly
+            for i in range(9):
+                key_text = f"r_text_{i}"
+                key_time = f"r_time_{i}"
+                if i < len(blocks):
+                    block_content = blocks[i].strip()
+                    time_match = time_re.search(block_content)
+                    extracted_time = time_match.group(1) if time_match else f"{13+i}:30"
+                    
+                    st.session_state[key_text] = block_content
+                    st.session_state[key_time] = extracted_time
+                else:
+                    st.session_state[key_text] = ""
+
+            st.success(f"Successfully auto-sorted {min(len(blocks), 9)} races! Reloading inputs...")
+            st.rerun()
         else:
             st.warning("Please paste your raw racecard text into the box above first.")
 
@@ -100,17 +99,19 @@ with tab1:
     
     for i in range(9):
         r_num = i + 1
-        with st.expander(f"Race {r_num} — {st.session_state.races_data[i]['time']} ({meeting_course})", expanded=(i == 0)):
+        # Initialize default session keys if not set
+        if f"r_time_{i}" not in st.session_state:
+            st.session_state[f"r_time_{i}"] = f"{13+i}:30"
+        if f"r_text_{i}" not in st.session_state:
+            st.session_state[f"r_text_{i}"] = ""
+
+        with st.expander(f"Race {r_num} — {st.session_state[f'r_time_{i}']} ({meeting_course})", expanded=(i == 0)):
             rc_col1, rc_col2, rc_col3 = st.columns(3)
-            r_time = rc_col1.text_input(f"Race {r_num} Time", value=st.session_state.races_data[i]['time'], key=f"r_time_{i}")
+            r_time = rc_col1.text_input(f"Race {r_num} Time", key=f"r_time_{i}")
             r_class = rc_col2.selectbox(f"Race {r_num} Class", ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Group 1", "Group 2", "Group 3"], index=0, key=f"r_class_{i}")
-            r_dist = rc_col3.text_input(f"Race {r_num} Distance", value=st.session_state.races_data[i]['distance'], key=f"r_dist_{i}")
+            r_dist = rc_col3.text_input(f"Race {r_num} Distance", value="6f", key=f"r_dist_{i}")
             
-            r_text = st.text_area(f"Race {r_num} Raw Runners", value=st.session_state.races_data[i]['text'], height=160, key=f"r_text_{i}")
-            
-            # Save back to session state
-            st.session_state.races_data[i]['time'] = r_time
-            st.session_state.races_data[i]['text'] = r_text
+            r_text = st.text_area(f"Race {r_num} Raw Runners", height=160, key=f"r_text_{i}")
 
             # Generate individual formatted block for this race if text exists
             if r_text.strip():
